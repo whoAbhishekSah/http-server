@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"regexp"
 	"strings"
 )
 
@@ -45,12 +46,13 @@ func handleConnection(conn net.Conn) error {
 			path = splittedRestLine[1]
 		}
 	}
-	switch path {
-	case "/":
-		conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
-	default:
+	match, _ := regexp.MatchString("/echo/([a-z]+)", path)
+	if match {
+		toEcho := path[len("/echo/"):]
+		httpResp := fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", len(toEcho), toEcho)
+		conn.Write([]byte(httpResp))
+	} else {
 		conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
 	}
-
 	return nil
 }
