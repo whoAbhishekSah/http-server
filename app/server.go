@@ -27,8 +27,9 @@ func main() {
 	if err != nil {
 		fmt.Println(err.Error())
 	}
-	// fmt.Println(string(b), err.Error())
-	conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
+}
+func prepHttPResp(arg string) string {
+	return fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", len(arg), arg)
 }
 
 func handleConnection(conn net.Conn) error {
@@ -49,12 +50,15 @@ func handleConnection(conn net.Conn) error {
 	switch path {
 	case "/":
 		conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
+	case "/user-agent":
+		splittedUserAgent := strings.Split(string(buffer), "\r\nUser-Agent: ")[1]
+		userHeaderAgentValue := strings.Split(splittedUserAgent, "\r\n")[0]
+		conn.Write([]byte(prepHttPResp(userHeaderAgentValue)))
 	default:
 		match, _ := regexp.MatchString("/echo/([a-z]+)", path)
 		if match {
 			toEcho := path[len("/echo/"):]
-			httpResp := fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", len(toEcho), toEcho)
-			conn.Write([]byte(httpResp))
+			conn.Write([]byte(prepHttPResp(toEcho)))
 		}
 		conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
 	}
