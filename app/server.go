@@ -17,17 +17,17 @@ func main() {
 		fmt.Println("Failed to bind to port 4221", err.Error())
 		os.Exit(1)
 	}
-	conn, err := l.Accept()
-	if err != nil {
-		fmt.Println("Error accepting connection: ", err.Error())
-		os.Exit(1)
-	}
 
-	err = handleConnection(conn)
-	if err != nil {
-		fmt.Println(err.Error())
+	for {
+		conn, err := l.Accept()
+		if err != nil {
+			fmt.Println("Error accepting connection: ", err.Error())
+			os.Exit(1)
+		}
+		go handleConnection(conn)
 	}
 }
+
 func prepHttPResp(arg string) string {
 	return fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", len(arg), arg)
 }
@@ -62,6 +62,6 @@ func handleConnection(conn net.Conn) error {
 		}
 		conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
 	}
-
+	conn.Close()
 	return nil
 }
