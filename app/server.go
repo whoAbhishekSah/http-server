@@ -48,8 +48,9 @@ func handleConnection(conn net.Conn, directory string) error {
 func handleRequest(conn net.Conn, directory string, requestBuffer []byte) {
 	path := extractPathFromReqBuffer(requestBuffer)
 	method := extractMethodFromReqBuffer(requestBuffer)
+	encoding := extractEncodingHeaderFromReqBuffer(requestBuffer)
 
-	serverConn := server.ServerConn{TcpConn: conn, ReqPath: path, Directory: directory, HTTPMethod: method}
+	serverConn := server.ServerConn{TcpConn: conn, ReqPath: path, Directory: directory, HTTPMethod: method, Encoding: encoding}
 	switch path {
 	case "/":
 		serverConn.HandleRootReq()
@@ -89,4 +90,15 @@ func extractMethodFromReqBuffer(buffer []byte) string {
 		method = splitted[0]
 	}
 	return method
+}
+
+func extractEncodingHeaderFromReqBuffer(buffer []byte) string {
+	splitted := strings.Split(string(buffer), "\r\n")
+	encoding := ""
+	for _, item := range splitted {
+		if strings.Contains(item, "Accept-Encoding") {
+			encoding = strings.Split(item, ": ")[1]
+		}
+	}
+	return encoding
 }

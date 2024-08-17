@@ -13,6 +13,7 @@ type ServerConn struct {
 	ReqPath    string
 	Directory  string
 	HTTPMethod string
+	Encoding   string
 }
 
 func (s *ServerConn) HandleRootReq() {
@@ -22,12 +23,12 @@ func (s *ServerConn) HandleRootReq() {
 func (s *ServerConn) HandleUserAgentReq(requestBuffer []byte) {
 	splittedUserAgent := strings.Split(string(requestBuffer), "\r\nUser-Agent: ")[1]
 	userHeaderAgentValue := strings.Split(splittedUserAgent, "\r\n")[0]
-	s.TcpConn.Write([]byte(prepHttPResp(userHeaderAgentValue)))
+	s.TcpConn.Write([]byte(prepHttPResp(userHeaderAgentValue, s.Encoding)))
 }
 
 func (s *ServerConn) HandleEchoReq() {
 	toEcho := s.ReqPath[len("/echo/"):]
-	s.TcpConn.Write([]byte(prepHttPResp(toEcho)))
+	s.TcpConn.Write([]byte(prepHttPResp(toEcho, s.Encoding)))
 }
 
 func (s *ServerConn) HandleFileMatchReq(requestBuffer []byte) {
@@ -43,9 +44,6 @@ func (s *ServerConn) HandleFileMatchReq(requestBuffer []byte) {
 		s.TcpConn.Write([]byte(prepOctetHttpResp(fileBytes)))
 		return
 	case "POST":
-		splitted := strings.Split(string(requestBuffer), "\r\n")
-		fmt.Println(splitted)
-		// contentType := parseContentType(requestBuffer)
 		reqLine := parseRequestLine(requestBuffer)
 		fileName := parseFileNameFromRequstLine(reqLine)
 		reqBody := parseRequestBody(requestBuffer)
@@ -71,8 +69,11 @@ func (s *ServerConn) HandleNoContentReq() {
 	s.TcpConn.Write([]byte("HTTP/1.1 201 Created\r\n\r\n"))
 }
 
-func prepHttPResp(arg string) string {
-	return fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", len(arg), arg)
+func prepHttPResp(arg string, encoding string) string {
+	if !isValidEncoding(encoding) {
+		return fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", len(arg), arg)
+	}
+	return fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Encoding: %s\r\nContent-Length: %d\r\n\r\n%s", encoding, len(arg), arg)
 }
 
 func prepOctetHttpResp(bytes []byte) string {
@@ -82,9 +83,8 @@ func prepOctetHttpResp(bytes []byte) string {
 func parseContentLength(buffer []byte) int {
 	splitted := strings.Split(string(buffer), "\r\n")
 	contentLength := ""
-	for idx, item := range splitted {
-		fmt.Println(idx, item)
-		if strings.Contains(item, "Content-Length"){
+	for _, item := range splitted {
+		if strings.Contains(item, "Content-Length") {
 			contentLength = strings.Split(item, ": ")[1]
 		}
 	}
@@ -121,4 +121,8 @@ func parseRequestBody(buffer []byte) string {
 	splitted := strings.Split(string(buffer), "\r\n")
 	reqBody := splitted[len(splitted)-1]
 	return reqBody[0:contentLen]
+}
+
+func isValidEncoding(encoding string) bool {
+	return encoding == "gzip"
 }
