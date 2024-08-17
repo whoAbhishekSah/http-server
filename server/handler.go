@@ -85,8 +85,8 @@ func prepHttPResp(arg string, encoding string) string {
 	if err := gz.Close(); err != nil {
 		panic(err)
 	}
-	fmt.Println(len(b.Bytes()), b.Bytes())
-	return fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Encoding: %s\r\nContent-Length: %d\r\n\r\n%s", "gzip", len(b.Bytes()), b.Bytes())
+	
+	return fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Encoding: %s\r\nContent-Length: %d\r\n\r\n%s", "gzip", len(b.String()), b.String())
 }
 
 func prepOctetHttpResp(bytes []byte) string {
