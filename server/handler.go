@@ -15,9 +15,6 @@ type ServerConn struct {
 	HTTPMethod string
 }
 
-type httpReq struct {
-}
-
 func (s *ServerConn) HandleRootReq() {
 	s.TcpConn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
 }
@@ -52,13 +49,13 @@ func (s *ServerConn) HandleFileMatchReq(requestBuffer []byte) {
 		reqLine := parseRequestLine(requestBuffer)
 		fileName := parseFileNameFromRequstLine(reqLine)
 		reqBody := parseRequestBody(requestBuffer)
-			filePath := fmt.Sprintf("%s/%s", s.Directory, fileName)
-			err := os.WriteFile(filePath, []byte(reqBody), 0644)
-			if err != nil {
-				panic(err)
-			}
-			s.HandleNoContentReq()
-			return
+		filePath := fmt.Sprintf("%s/%s", s.Directory, fileName)
+		err := os.WriteFile(filePath, []byte(reqBody), 0644)
+		if err != nil {
+			panic(err)
+		}
+		s.HandleNoContentReq()
+		return
 
 	default:
 		s.HandleNotFoundReq()
@@ -85,10 +82,13 @@ func prepOctetHttpResp(bytes []byte) string {
 func parseContentLength(buffer []byte) int {
 	splitted := strings.Split(string(buffer), "\r\n")
 	contentLength := ""
-	//the 6th item in this list is content type
-	if len(splitted) >= 5 {
-		contentLength = strings.Split(splitted[4], ": ")[1]
+	for idx, item := range splitted {
+		fmt.Println(idx, item)
+		if strings.Contains(item, "Content-Length"){
+			contentLength = strings.Split(item, ": ")[1]
+		}
 	}
+
 	i, err := strconv.Atoi(contentLength)
 	if err != nil {
 		panic(err)
@@ -99,21 +99,10 @@ func parseContentLength(buffer []byte) int {
 func parseRequestLine(buffer []byte) string {
 	splitted := strings.Split(string(buffer), "\r\n")
 	reqLine := ""
-	//the 6th item in this list is content length
 	if len(splitted) >= 1 {
 		reqLine = splitted[0]
 	}
 	return reqLine
-}
-
-func parseContentType(buffer []byte) string {
-	splitted := strings.Split(string(buffer), "\r\n")
-	contentType := ""
-	//the 6th item in this list is content length
-	if len(splitted) >= 6 {
-		contentType = strings.Split(splitted[5], ": ")[1]
-	}
-	return contentType
 }
 
 // reqLine must be of format "POST /files/file_123 HTTP/1.1"
