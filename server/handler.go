@@ -78,7 +78,6 @@ func prepHttPResp(arg string, encoding string) string {
 
 	var b bytes.Buffer
 	gz := gzip.NewWriter(&b)
-	gz.Write([]byte(arg))
 	if _, err := gz.Write([]byte(arg)); err != nil {
 		panic(err)
 	}
