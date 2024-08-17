@@ -47,7 +47,9 @@ func handleConnection(conn net.Conn, directory string) error {
 
 func handleRequest(conn net.Conn, directory string, requestBuffer []byte) {
 	path := extractPathFromReqBuffer(requestBuffer)
-	serverConn := server.ServerConn{TcpConn: conn, ReqPath: path, Directory: directory}
+	method := extractMethodFromReqBuffer(requestBuffer)
+
+	serverConn := server.ServerConn{TcpConn: conn, ReqPath: path, Directory: directory, HTTPMethod: method}
 	switch path {
 	case "/":
 		serverConn.HandleRootReq()
@@ -58,9 +60,11 @@ func handleRequest(conn net.Conn, directory string, requestBuffer []byte) {
 		filesMatch, _ := regexp.MatchString("/files/([a-z]+)", path)
 		if echoMatch {
 			serverConn.HandleEchoReq()
+			return
 		}
 		if filesMatch {
-			serverConn.HandleFileMatchReq()
+			serverConn.HandleFileMatchReq(requestBuffer)
+			return
 		}
 		serverConn.HandleNotFoundReq()
 	}
@@ -76,4 +80,13 @@ func extractPathFromReqBuffer(buffer []byte) string {
 		}
 	}
 	return path
+}
+
+func extractMethodFromReqBuffer(buffer []byte) string {
+	splitted := strings.Split(string(buffer), " ")
+	method := ""
+	if len(splitted) > 0 {
+		method = splitted[0]
+	}
+	return method
 }

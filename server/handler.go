@@ -4,13 +4,18 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 )
 
 type ServerConn struct {
-	TcpConn   net.Conn
-	ReqPath   string
-	Directory string
+	TcpConn    net.Conn
+	ReqPath    string
+	Directory  string
+	HTTPMethod string
+}
+
+type httpReq struct {
 }
 
 func (s *ServerConn) HandleRootReq() {
@@ -28,19 +33,45 @@ func (s *ServerConn) HandleEchoReq() {
 	s.TcpConn.Write([]byte(prepHttPResp(toEcho)))
 }
 
-func (s *ServerConn) HandleFileMatchReq() {
-	fileName := s.ReqPath[len("/file/"):]
-	fileBytes, err := os.ReadFile(fmt.Sprintf("%s/%s", s.Directory, fileName))
-	if err != nil {
-		// TODO: all errors must not be 404 !
-		s.TcpConn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
+func (s *ServerConn) HandleFileMatchReq(requestBuffer []byte) {
+	switch s.HTTPMethod {
+	case "GET":
+		fileName := s.ReqPath[len("/file/"):]
+		fileBytes, err := os.ReadFile(fmt.Sprintf("%s/%s", s.Directory, fileName))
+		if err != nil {
+			// TODO: all errors must not be 404 !
+			s.TcpConn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
+			return
+		}
+		s.TcpConn.Write([]byte(prepOctetHttpResp(fileBytes)))
 		return
+	case "POST":
+		splitted := strings.Split(string(requestBuffer), "\r\n")
+		fmt.Println(splitted)
+		// contentType := parseContentType(requestBuffer)
+		reqLine := parseRequestLine(requestBuffer)
+		fileName := parseFileNameFromRequstLine(reqLine)
+		reqBody := parseRequestBody(requestBuffer)
+			filePath := fmt.Sprintf("%s/%s", s.Directory, fileName)
+			err := os.WriteFile(filePath, []byte(reqBody), 0644)
+			if err != nil {
+				panic(err)
+			}
+			s.HandleNoContentReq()
+			return
+
+	default:
+		s.HandleNotFoundReq()
 	}
-	s.TcpConn.Write([]byte(prepOctetHttpResp(fileBytes)))
+
 }
 
 func (s *ServerConn) HandleNotFoundReq() {
 	s.TcpConn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
+}
+
+func (s *ServerConn) HandleNoContentReq() {
+	s.TcpConn.Write([]byte("HTTP/1.1 201 Created\r\n\r\n"))
 }
 
 func prepHttPResp(arg string) string {
@@ -49,4 +80,56 @@ func prepHttPResp(arg string) string {
 
 func prepOctetHttpResp(bytes []byte) string {
 	return fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: %d\r\n\r\n%s", len(string(bytes)), string(bytes))
+}
+
+func parseContentLength(buffer []byte) int {
+	splitted := strings.Split(string(buffer), "\r\n")
+	contentLength := ""
+	//the 6th item in this list is content type
+	if len(splitted) >= 5 {
+		contentLength = strings.Split(splitted[4], ": ")[1]
+	}
+	i, err := strconv.Atoi(contentLength)
+	if err != nil {
+		panic(err)
+	}
+	return i
+}
+
+func parseRequestLine(buffer []byte) string {
+	splitted := strings.Split(string(buffer), "\r\n")
+	reqLine := ""
+	//the 6th item in this list is content length
+	if len(splitted) >= 1 {
+		reqLine = splitted[0]
+	}
+	return reqLine
+}
+
+func parseContentType(buffer []byte) string {
+	splitted := strings.Split(string(buffer), "\r\n")
+	contentType := ""
+	//the 6th item in this list is content length
+	if len(splitted) >= 6 {
+		contentType = strings.Split(splitted[5], ": ")[1]
+	}
+	return contentType
+}
+
+// reqLine must be of format "POST /files/file_123 HTTP/1.1"
+func parseFileNameFromRequstLine(reqLine string) string {
+	splitted := strings.Split(reqLine, " ")
+	fileName := ""
+	if len(splitted) >= 2 {
+		filesPath := strings.Split(splitted[1], "/")
+		fileName = filesPath[len(filesPath)-1]
+	}
+	return fileName
+}
+
+func parseRequestBody(buffer []byte) string {
+	contentLen := parseContentLength(buffer)
+	splitted := strings.Split(string(buffer), "\r\n")
+	reqBody := splitted[len(splitted)-1]
+	return reqBody[0:contentLen]
 }
