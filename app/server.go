@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/codecrafters-io/http-server-starter-go/server"
 	"net"
 	"os"
 	"regexp"
@@ -32,14 +33,6 @@ func main() {
 	}
 }
 
-func prepHttPResp(arg string) string {
-	return fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", len(arg), arg)
-}
-
-func prepOctetHttpResp(bytes []byte) string {
-	return fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: %d\r\n\r\n%s", len(string(bytes)), string(bytes))
-}
-
 func handleConnection(conn net.Conn, directory string) error {
 	defer conn.Close()
 	buffer := make([]byte, 1024)
@@ -48,6 +41,32 @@ func handleConnection(conn net.Conn, directory string) error {
 		return err
 	}
 
+	handleRequest(conn, directory, buffer)
+	return nil
+}
+
+func handleRequest(conn net.Conn, directory string, requestBuffer []byte) {
+	path := extractPathFromReqBuffer(requestBuffer)
+	serverConn := server.ServerConn{TcpConn: conn, ReqPath: path, Directory: directory}
+	switch path {
+	case "/":
+		serverConn.HandleRootReq()
+	case "/user-agent":
+		serverConn.HandleUserAgentReq(requestBuffer)
+	default:
+		echoMatch, _ := regexp.MatchString("/echo/([a-z]+)", path)
+		filesMatch, _ := regexp.MatchString("/files/([a-z]+)", path)
+		if echoMatch {
+			serverConn.HandleEchoReq()
+		}
+		if filesMatch {
+			serverConn.HandleFileMatchReq()
+		}
+		serverConn.HandleNotFoundReq()
+	}
+}
+
+func extractPathFromReqBuffer(buffer []byte) string {
 	splitted := strings.Split(string(buffer), "\r\n")
 	path := ""
 	if len(splitted) > 0 {
@@ -56,32 +75,5 @@ func handleConnection(conn net.Conn, directory string) error {
 			path = splittedRestLine[1]
 		}
 	}
-	switch path {
-	case "/":
-		conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
-	case "/user-agent":
-		splittedUserAgent := strings.Split(string(buffer), "\r\nUser-Agent: ")[1]
-		userHeaderAgentValue := strings.Split(splittedUserAgent, "\r\n")[0]
-		conn.Write([]byte(prepHttPResp(userHeaderAgentValue)))
-	default:
-		echoMatch, _ := regexp.MatchString("/echo/([a-z]+)", path)
-		filesMatch, _ := regexp.MatchString("/files/([a-z]+)", path)
-		if echoMatch {
-			toEcho := path[len("/echo/"):]
-			conn.Write([]byte(prepHttPResp(toEcho)))
-			return nil
-		}
-		if filesMatch {
-			fileName := path[len("/file/"):]
-			fileBytes, err := os.ReadFile(fmt.Sprintf("%s/%s", directory, fileName))
-			if err != nil {
-				conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
-				return nil
-			}
-			conn.Write([]byte(prepOctetHttpResp(fileBytes)))
-			return nil
-		}
-		conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
-	}
-	return nil
+	return path
 }
