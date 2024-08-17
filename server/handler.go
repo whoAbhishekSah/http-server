@@ -70,10 +70,10 @@ func (s *ServerConn) HandleNoContentReq() {
 }
 
 func prepHttPResp(arg string, encoding string) string {
-	if !isValidEncoding(encoding) {
+	if !isValidEncodingFound(encoding) {
 		return fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", len(arg), arg)
 	}
-	return fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Encoding: %s\r\nContent-Length: %d\r\n\r\n%s", encoding, len(arg), arg)
+	return fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Encoding: %s\r\nContent-Length: %d\r\n\r\n%s", "gzip", len(arg), arg)
 }
 
 func prepOctetHttpResp(bytes []byte) string {
@@ -123,6 +123,11 @@ func parseRequestBody(buffer []byte) string {
 	return reqBody[0:contentLen]
 }
 
-func isValidEncoding(encoding string) bool {
-	return encoding == "gzip"
+func isValidEncodingFound(encodings string) bool {
+	for _, item := range strings.Split(encodings, ",") {
+		if strings.Trim(item, " ") == "gzip" {
+			return true
+		}
+	}
+	return false
 }
